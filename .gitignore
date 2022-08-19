@@ -1,0 +1,9 @@
+api.txt
+furatasa.sqlite
+my_account.session
+my_account.session-journal
+avas/day.png
+avas/night.png
+avas/default.png
+__pycache__/
+.idea/
