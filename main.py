@@ -1,33 +1,22 @@
-try:
-    import sys
-    import random
-    import sqlite3
-    import datetime
-    import threading
-    import time
+try: import sys, random, sqlite3, datetime, threading, time
 except ImportError as ie:
     print(f'Ошибка, какой-то из необходимых модулей не установился. Используйте python 3.10.\n{ie}')
     sys.exit(1)
 
-try:
-    from pyrogram import Client, filters, enums, types
+try: from pyrogram import Client, filters, enums, types, errors
 except ImportError:
     print('Ошибка, необходимо установить модуль pyrogram')
     sys.exit(1)
-try:
-    import messages as msgs
+try: import messages as msgs
 except ImportError:
     print(f'В папку с этим исполняемым файлом нужно положить messages.py')
     sys.exit(1)
-try:
-    import cards
+try: import cards
 except ImportError:
     print(f'В папку с этим исполняемым файлом нужно положить cards.py')
     sys.exit(1)
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+try: import configparser
+except ImportError: import ConfigParser as configparser
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -36,9 +25,10 @@ bot = Client("my_account", api_id=config['pyrogram']['api_id'], api_hash=config[
 
 ava_enabled = False
 
-@bot.on_message(filters.me)
-async def echo(client, msg: types.Message):
+async def my_message(client: Client, msg: types.Message):
     if msg.text is None: return
+
+    #print() # DO NOT DELETE IT
 
     config.read('config.ini')
 
@@ -53,107 +43,71 @@ async def echo(client, msg: types.Message):
         new_text = new_text.replace('%%chat id%%', str(msg.chat.id)) \
             .replace('%%random credit%%', random_credit) \
             .replace('%%my id%%', str(bot.me.id))
-        if bot.me.username is not None:
-            new_text = new_text.replace('%%my username%%', bot.me.username)
-        if msg.chat.title is not None:
-            new_text = new_text.replace('%%chat title%%', msg.chat.title)
-        if msg.chat.username is not None:
-            new_text = new_text.replace('%%chat username%%', msg.chat.username)
+        if bot.me.username is not None: new_text = new_text.replace('%%my username%%', bot.me.username)
+        if msg.chat.title is not None: new_text = new_text.replace('%%chat title%%', msg.chat.title)
+        if msg.chat.username is not None: new_text = new_text.replace('%%chat username%%', msg.chat.username)
 
         result = db(f'select * from messages')
         if len(result) != 0:
             for _ in range(1, int(config['inline']['nesting'])):
-                for i in result:
-                    new_text = new_text.replace(f'%{i[0]}%', i[1])
+                for i in result: new_text = new_text.replace(f'%{i[0]}%', i[1])
 
     old_text = msg.text
     msg.text = new_text
 
     if msg.text == "!whoami":
-        await bot.edit_message_text(msg.chat.id, msg.id, f'id: {bot.get_me().id}\nusername: @{bot.get_me().username}\nЗвать {bot.get_me().first_name}')
+        await bot.edit_message_text(msg.chat.id, msg.id, f'id: {bot.get_me().id}\n'
+                                                         f'username: @{bot.get_me().username}\n'
+                                                         f'Звать {bot.get_me().first_name}')
     elif msg.text == "!help":
         await bot.edit_message_text(msg.chat.id, msg.id, msgs.HELP)
     elif msg.text == "!chat":
-        title = ""
-        if msg.chat.title is not None:
-            title = f'Название: {msg.chat.title}\n'
-        link = ""
-        if msg.chat.username is not None:
-            link = f'Ссылка: https://t.me/{msg.chat.username}\n'
-        bio = ""
-        if msg.chat.bio is not None:
-            bio = f'Био: {msg.chat.bio}\n'
-        description = ""
-        if msg.chat.description is not None:
-            description = f'Описание: {msg.chat.description}\n'
-        count = ""
-        if msg.chat.members_count is not None:
-            count = f'Количество участников: {msg.chat.members_count}\n'
-        type = 'Это '
-        if msg.chat.type == enums.ChatType.PRIVATE:
-            type += 'приватный чат'
-        elif msg.chat.type == enums.ChatType.BOT:
-            type += 'чат с ботом'
-        elif msg.chat.type == enums.ChatType.GROUP:
-            type += 'групповой чат'
-        elif msg.chat.type == enums.ChatType.SUPERGROUP:
-            type += 'супергруппа'
-        elif msg.chat.type == enums.ChatType.CHANNEL:
-            type += 'канал'
+        title = ''
+        if msg.chat.title is not None: title = f'Название: {msg.chat.title}\n'
+        link = ''
+        if msg.chat.username is not None: link = f'Ссылка: https://t.me/{msg.chat.username}\n'
+        bio = ''
+        if msg.chat.bio is not None: bio = f'Био: {msg.chat.bio}\n'
+        description = ''
+        if msg.chat.description is not None: description = f'Описание: {msg.chat.description}\n'
+        count = ''
+        if msg.chat.members_count is not None: count = f'Количество участников: {msg.chat.members_count}\n'
+        chat_type = 'Это '
+        if msg.chat.type == enums.ChatType.PRIVATE:  chat_type += 'приватный чат'
+        elif msg.chat.type == enums.ChatType.BOT: chat_type += 'чат с ботом'
+        elif msg.chat.type == enums.ChatType.GROUP: chat_type += 'групповой чат'
+        elif msg.chat.type == enums.ChatType.SUPERGROUP: chat_type += 'супергруппа'
+        elif msg.chat.type == enums.ChatType.CHANNEL: chat_type += 'канал'
         permissions = ''
         if msg.chat.permissions is not None:
             permissions = 'Обычному пользователю можно:\n'
-            if msg.chat.permissions.can_send_messages:
-                permissions += '    - Отправлять сообщения\n'
-            if msg.chat.permissions.can_send_media_messages:
-                permissions += '    - Отправлять медиафайлы\n'
-            if msg.chat.permissions.can_send_other_messages:
-                permissions += '    - Отправлять стикеры, анимации, игры и использовать inline-ботов\n'
-            if msg.chat.permissions.can_send_polls:
-                permissions += '    - Создавать опросы\n'
-            if msg.chat.permissions.can_add_web_page_previews:
-                permissions += '    - Добавлять превью к веб-страницам\n'
-            if msg.chat.permissions.can_change_info:
-                permissions += '    - Изменять информацию о группе\n'
-            if msg.chat.permissions.can_invite_users:
-                permissions += '    - Приглашать пользователей\n'
-            if msg.chat.permissions.can_pin_messages:
-                permissions += '    - Закреплять сообщения\n'
-            if permissions == 'Обычному пользователю можно:\n':
-                permissions = 'Обычному пользователю ничего нельзя\n'
-        reactions = ''
-        if msg.chat.available_reactions is not None:
-            reactions = 'Доступные реакции: ' + ', '.join(msg.chat.available_reactions)
+            if msg.chat.permissions.can_send_messages: permissions += '\t- Отправлять сообщения\n'
+            if msg.chat.permissions.can_send_media_messages: permissions += '\t- Отправлять медиафайлы\n'
+            if msg.chat.permissions.can_send_other_messages: permissions += '\t- Отправлять стикеры, анимации, игры и использовать inline-ботов\n'
+            if msg.chat.permissions.can_send_polls:  permissions += '\t- Создавать опросы\n'
+            if msg.chat.permissions.can_add_web_page_previews: permissions += '\t- Добавлять превью к веб-страницам\n'
+            if msg.chat.permissions.can_change_info: permissions += '\t- Изменять информацию о группе\n'
+            if msg.chat.permissions.can_invite_users: permissions += '\t- Приглашать пользователей\n'
+            if msg.chat.permissions.can_pin_messages: permissions += '\t- Закреплять сообщения\n'
+            if permissions == 'Обычному пользователю можно:\n': permissions = 'Обычному пользователю ничего нельзя\n'
+        reactions = '' if msg.chat.available_reactions is None else 'Доступные реакции: ' + ', '.join(msg.chat.available_reactions)
         await bot.edit_message_text(msg.chat.id, msg.id, f'id: {msg.chat.id}\n{title}{type}\n{link}{bio}{description}{reactions}{count}{"Чат верифицирован" if msg.chat.is_verified else "Чат не верифицирован"}\n{permissions}')
     elif msg.text.startswith('!dice'):
-        number = 0
         try:
             number = int(msg.text[5:])
             await bot.edit_message_text(msg.chat.id, msg.id, str(random.randint(1, number)))
-        except ValueError:
-            await bot.delete_messages(msg.chat.id, [msg.id])
+        except ValueError: await bot.delete_messages(msg.chat.id, [msg.id])
     if msg.text == '!random credit':
-        rand = random.randint(0, 6)
-        card = 'VISA'
-        if rand == 0:
-            card = 'MIR'
-        elif rand == 1:
-            card = 'VISA'
-        elif rand == 2:
-            card = 'MASTERCARD'
-        elif rand == 3:
-            card = 'MAESTRO'
-        elif rand == 4:
-            card = 'AMERICAN-EXPRESS'
-        elif rand == 5:
-            card = 'UNION-PAY'
+        cards_enum = [
+            'VISA', 'MIR', 'MASTERCARD', 'MAESTRO', 'AMERICAN-EXPRESS', 'UNION-PAY'
+        ]
+        card = cards_enum[random.randint(0, len(cards_enum) - 1)]
         await bot.edit_message_text(msg.chat.id, msg.id, f'{cards.gen(key=card)} ({cards.randomDate()[1]}/{cards.randomDate()[0]}, {cards.randomCCV()})')
     elif msg.text.startswith('!msg read '):
         name = msg.text[10:]
-        if msg.reply_to_message is not None:
-            if msg.reply_to_message.text is not None:
-                text = msg.reply_to_message.text
-                db(f'insert into messages(name, text) values(\'{name}\', \'{text}\')')
+        if msg.reply_to_message is not None and msg.reply_to_message.text is not None:
+            text = msg.reply_to_message.text
+            db(f'insert into messages(name, text) values(\'{name}\', \'{text}\')')
         await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!msg write '):
         name = msg.text[11:]
@@ -162,14 +116,13 @@ async def echo(client, msg: types.Message):
         else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!msg remove '):
         name = msg.text[12:]
-        result = db(f'delete from messages where name = \'{name}\'')
-        result = db(f'select text from messages where name = \'{name}\'')
+        db(f'delete from messages where name = \'{name}\'')
+        db(f'select text from messages where name = \'{name}\'')
         await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!msg info':
         if msg.reply_to_message is not None:
-            username = ''
-            if msg.reply_to_message.from_user.username is not None:
-                username = f'Username отправителя: @{msg.reply_to_message.from_user.username}\n'
+            username = '' if msg.reply_to_message.from_user.username is None else \
+                f'Username отправителя: @{msg.reply_to_message.from_user.username}\n'
             await bot.edit_message_text(msg.chat.id, msg.id, f'id: {msg.reply_to_message.id}\nid отправителя: {msg.reply_to_message.from_user.id}\n{username}Время: {msg.date.strftime("%Y.%m.%d %H:%m:%s")}\nДля большей информации о пользователе вызовите !user info')
         else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!user info '):
@@ -186,53 +139,42 @@ async def echo(client, msg: types.Message):
     elif msg.text == '!msg all':
         result = db(f'select name from messages')
         if len(result) != 0:
-            all = []
-            for i in result:
-                all.append(i[0])
-            await bot.edit_message_text(msg.chat.id, msg.id, 'Список всех сообщений: ' + (', '.join(all)), parse_mode=None)
+            all_msgs = []
+            for i in result: all_msgs.append(i[0])
+            await bot.edit_message_text(msg.chat.id, msg.id, 'Список всех сообщений: ' + (', '.join(all_msgs)), parse_mode=None)
         else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!type'):
         msg.text = msg.text[5:]
-        (
-            threading.Thread(target=typeem, args=[msg, 0.1])
-        ).start()
+        threading.Thread(target=typeem, args=[msg, 0.1]).start()
     elif msg.text == '!ava set day':
         try:
-            if msg.reply_to_message is not None:
-                if msg.reply_to_message.media is not None:
-                    await bot.download_media(msg.reply_to_message, 'avas/day.png')
-                else:
-                    await bot.delete_messages(msg.chat.id, [msg.id])
-            else:
-                await bot.delete_messages(msg.chat.id, [msg.id])
-        except ValueError: await bot.delete_messages(msg.chat.id, [msg.id])
+            if msg.reply_to_message is not None and msg.reply_to_message.media is not None:
+                await bot.download_media(msg.reply_to_message, 'avas/day.png')
+                config.set('do_not_change', 'current_ava', '')
+        except ValueError: pass
+        except errors.exceptions.bad_request_400.PhotoCropSizeSmall: pass
+        await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!ava set night':
         try:
-            if msg.reply_to_message is not None:
-                if msg.reply_to_message.media is not None:
-                    await bot.download_media(msg.reply_to_message, 'avas/night.png')
-                else:
-                    await bot.delete_messages(msg.chat.id, [msg.id])
-            else:
-                await bot.delete_messages(msg.chat.id, [msg.id])
-        except ValueError: await bot.delete_messages(msg.chat.id, [msg.id])
+            if msg.reply_to_message is not None and msg.reply_to_message.media is not None:
+                await bot.download_media(msg.reply_to_message, 'avas/night.png')
+                config.set('do_not_change', 'current_ava', '')
+        except ValueError: pass
+        except errors.exceptions.bad_request_400.PhotoCropSizeSmall: pass
+        await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!ava set default':
         try:
-            if msg.reply_to_message is not None:
-                if msg.reply_to_message.media is not None:
-                    await bot.download_media(msg.reply_to_message, 'avas/default.png')
-                else:
-                    await bot.delete_messages(msg.chat.id, [msg.id])
-            else:
-                await bot.delete_messages(msg.chat.id, [msg.id])
-        except ValueError: await bot.delete_messages(msg.chat.id, [msg.id])
+            if msg.reply_to_message is not None and msg.reply_to_message.media is not None:
+                await bot.download_media(msg.reply_to_message, 'avas/default.png')
+                config.set('do_not_change', 'current_ava', '')
+        except ValueError: pass
+        except errors.exceptions.bad_request_400.PhotoCropSizeSmall: pass
+        await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!inline on':
         config.set('inline', 'enabled', 'true')
         await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!inline off':
         config.set('inline', 'enabled', 'false')
-        with open('config.ini', 'w') as configfile:  # save
-            config.write(configfile)
         await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!ava on':
         config.set('avatar', 'dynamic', 'true')
@@ -253,35 +195,111 @@ async def echo(client, msg: types.Message):
     elif msg.text == '!ava get time':
         if config.get('avatar', 'dynamic') == 'true': await bot.edit_message_text(msg.chat.id, msg.id, f'Дневная аватарка с {config.get("avatar", "day_time")} до {config.get("avatar", "night_time")}\nНочная аватарка с {config.get("avatar", "night_time")} до {config.get("avatar", "day_time")}')
         else: await bot.edit_message_text(msg.chat.id, msg.id, 'Динамическая аватарка выключена')
-    elif old_text != msg.text:
-        await bot.edit_message_text(msg.chat.id, msg.id, msg.text)
+    elif msg.text.startswith('!msg auto add '):
+        print("hi")
+        print(msg.text[14:].split(sep=' '))
+        if len(msg.text[14:].split(sep=' ')) == 3:
+            name = msg.text[14:].split(sep=' ')[0]
+            name1 = msg.text[14:].split(sep=' ')[1]
+            name2 = msg.text[14:].split(sep=' ')[2]
 
-    with open('config.ini', 'w') as configfile:  # save config
-        config.write(configfile)
+            db(f'insert into autoresponder(name, entrance, output, whitelist, blacklist, usewhitelist) values("{name}","{name1}","{name2}","","",0)')
 
-    if not ava_enabled:
-        threading.Thread(target=ava).start()
+
+
+    elif old_text != msg.text: await bot.edit_message_text(msg.chat.id, msg.id, msg.text)
+
+    with open('config.ini', 'w') as configfile: config.write(configfile)
+
+    if not ava_enabled: threading.Thread(target=ava).start()
+
+
+async def autoresponder(client: Client, msg: types.Message):
+    if msg.chat.type != enums.ChatType.PRIVATE and msg.chat.type != enums.ChatType.BOT:
+        if msg.reply_to_message is not None:
+            if msg.reply_to_message.from_user is not None:
+                if msg.reply_to_message.from_user == bot.me:
+                    pass
+                else:
+                    return
+            else:
+                return
+        else:
+            return
+    else:
+        pass
+    result = db('select * from autoresponder')
+    if len(result) != 0:
+        for i in result:
+            entrance_name: str = i[1]
+            output_name: str = i[2]
+            whitelist_str: str = i[3]
+            blacklist_str: str = i[4]
+            use_whitelist: int = i[5]
+
+            whitelist: list = whitelist_str.split(sep=',')
+            blacklist: list = blacklist_str.split(sep=',')
+
+            print(whitelist)
+
+            send: bool = True
+
+            result_messages: list = db(f'select text from messages where name = "{entrance_name}"')
+            if len(result_messages) == 0: return
+            entrance: str = result_messages[0][0]
+
+            result_messages: list = db(f'select text from messages where name = "{output_name}"')
+            if len(result_messages) == 0: return
+            output: str = result_messages[0][0]
+
+            if use_whitelist == 0:
+                if len(blacklist) != 0:
+                    send = True
+                    for j in blacklist:
+                        if j == msg.from_user.id or j == msg.from_user.username: send = False
+            elif use_whitelist == 1:
+                if len(whitelist) != 0:
+                    send = False
+                    for j in whitelist:
+                        if j == msg.from_user.id or j == msg.from_user.username: send = True
+
+            if not send: break
+
+            if entrance.lower() in msg.text.lower():
+                await bot.send_message(msg.chat.id, output)
+                break
+
+
+@bot.on_message()
+async def message(client: Client, msg: types.Message):
+    if msg.from_user is not None and msg.from_user.id == bot.me.id: await my_message(client, msg)
+    else: await autoresponder(client, msg)
+
+
+@bot.on_edited_message()
+async def edit_command(client: Client, msg: types.Message):
+    if msg.from_user == bot.me:
+        await my_message(client, msg)
+
 
 def ava():
     while True:
+        global ava_enabled
+        ava_enabled = False
         if config['avatar']['dynamic'] == 'true':
-            if config['avatar']['dynamic'] == 'false': break
-            global ava_enabled
-            ava_enabled = False
-            if time_in_range(datetime.datetime.strptime(config['avatar']['day_time'], '%H:%M').time(), datetime.datetime.strptime(config['avatar']['night_time'], '%H:%M').time(), datetime.datetime.now().time()):
+            if time_in_range(datetime.datetime.strptime(config['avatar']['day_time'], '%H:%M').time(),
+                             datetime.datetime.strptime(config['avatar']['night_time'], '%H:%M').time(),
+                             datetime.datetime.now().time()):
                 if config['do_not_change']['current_ava'] != '1':
                     bot.set_profile_photo(photo=config['avatar']['day'])
                     config.set('do_not_change', 'current_ava', '1')
-            else:
-                if config['do_not_change']['current_ava'] != '2':
-                    bot.set_profile_photo(photo=config['avatar']['night'])
-                    config.set('do_not_change', 'current_ava', '2')
-        else:
-            if config['do_not_change']['current_ava'] != '0':
-                bot.set_profile_photo(photo=config['avatar']['default'])
-                config.set('do_not_change', 'current_ava', '0')
-        with open('config.ini', 'w') as configfile:  # save
-            config.write(configfile)
+            elif config['do_not_change']['current_ava'] != '2':
+                bot.set_profile_photo(photo=config['avatar']['night'])
+                config.set('do_not_change', 'current_ava', '2')
+        elif config['do_not_change']['current_ava'] != '0':
+            bot.set_profile_photo(photo=config['avatar']['default'])
+            config.set('do_not_change', 'current_ava', '0')
+        with open('config.ini', 'w') as configfile: config.write(configfile)
         time.sleep(5)
 
 def typeem(msg, dur):
@@ -291,8 +309,8 @@ def typeem(msg, dur):
             curr_text = curr_text[0:i-1]
             curr_text += msg.text[i]
             curr_text += '*' * (len(msg.text) - i - 1)
-            if len(curr_text) != 0:
-                bot.edit_message_text(msg.chat.id, msg.id, curr_text, parse_mode=enums.ParseMode.DISABLED)
+            if len(curr_text) == 0: continue
+            bot.edit_message_text(msg.chat.id, msg.id, curr_text, parse_mode=enums.ParseMode.DISABLED)
             time.sleep(dur)
 
 
@@ -301,7 +319,7 @@ def time_in_range(start: datetime, end: datetime, current: datetime):
 
 
 def db(command: str):
-    database = sqlite3.connect('furatasa.sqlite')
+    database = sqlite3.connect(config['database']['file'])
     cursor = database.cursor()
     cursor.execute(command)
     database.commit()
@@ -314,9 +332,10 @@ def main():
     try:
         print('Бот запущен\n', 'Нажмите ctrl+d для выхода', sep='')
         bot.run()
-    except KeyboardInterrupt:
+    except KeyError:
+        print('KeyError')
+    except Exception:
         print('До свидания!')
-        sys.exit(0)
     return 0
 
 
