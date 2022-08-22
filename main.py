@@ -28,8 +28,6 @@ ava_enabled = False
 async def my_message(client: Client, msg: types.Message):
     if msg.text is None: return
 
-    #print() # DO NOT DELETE IT
-
     config.read('config.ini')
 
     new_text = msg.text
@@ -97,7 +95,7 @@ async def my_message(client: Client, msg: types.Message):
             number = int(msg.text[5:])
             await bot.edit_message_text(msg.chat.id, msg.id, str(random.randint(1, number)))
         except ValueError: await bot.delete_messages(msg.chat.id, [msg.id])
-    if msg.text == '!random credit':
+    elif msg.text == '!random credit':
         cards_enum = [
             'VISA', 'MIR', 'MASTERCARD', 'MAESTRO', 'AMERICAN-EXPRESS', 'UNION-PAY'
         ]
@@ -196,21 +194,77 @@ async def my_message(client: Client, msg: types.Message):
         if config.get('avatar', 'dynamic') == 'true': await bot.edit_message_text(msg.chat.id, msg.id, f'Дневная аватарка с {config.get("avatar", "day_time")} до {config.get("avatar", "night_time")}\nНочная аватарка с {config.get("avatar", "night_time")} до {config.get("avatar", "day_time")}')
         else: await bot.edit_message_text(msg.chat.id, msg.id, 'Динамическая аватарка выключена')
     elif msg.text.startswith('!msg auto add '):
-        print("hi")
-        print(msg.text[14:].split(sep=' '))
         if len(msg.text[14:].split(sep=' ')) == 3:
             name = msg.text[14:].split(sep=' ')[0]
             name1 = msg.text[14:].split(sep=' ')[1]
             name2 = msg.text[14:].split(sep=' ')[2]
 
             db(f'insert into autoresponder(name, entrance, output, whitelist, blacklist, usewhitelist) values("{name}","{name1}","{name2}","","",0)')
-
-
-
+        await bot.delete_messages(msg.chat.id, [msg.id])
+    elif msg.text.startswith('!msg auto remove '):
+        if len(msg.text[17:].split(sep=' ')) != 0:
+            name = msg.text[17:].split(sep=' ')[0]
+            db(f'delete from autoresponder where name = "{name}"')
+        await bot.delete_messages(msg.chat.id, [msg.id])
+    elif msg.text == '!msg auto all':
+        result = db('select name from autoresponder')
+        if len(result) != 0:
+            names = []
+            for i in result:
+                names.append(i[0])
+            await bot.edit_message_text(msg.chat.id, msg.id, ', '.join(names))
+    elif msg.text.startswith('!msg auto get '):
+        name = msg.text[14:]
+        result: list = db(f'select * from autoresponder where name = "{name}"')
+        if len(result) != 0:
+            info = f'Название: {name}\n'
+            info += f'Входная фраза: {result[0][1]}\n'
+            info += f'Выходная фраза: {result[0][2]}\n'
+            if result[0][5] == 1:
+                if result[0][3] != '':
+                    info += f'Белый список: {result[0][3]}\n'
+            else:
+                if result[0][4] != '':
+                    info += f'Черный список: {result[0][4]}\n'
+            await bot.edit_message_text(msg.chat.id, msg.id, info)
+        else: await bot.delete_messages(msg.chat.id, [msg.id])
+    elif msg.text.startswith('!msg auto '):
+        args = msg.text[10:].split(sep=' ')
+        if len(args) == 4:
+            name = args[0]
+            if args[2] == 'wlist':
+                result = db(f'select whitelist from autoresponder where name = "{name}"')
+                if len(result) != 0:
+                    whitelist: list = result[0][0].split(sep=',')
+                    if args[1] == 'add':
+                        whitelist.append(args[3])
+                    elif args[1] == 'remove':
+                        whitelist.remove(args[3])
+                    try: whitelist.remove('')
+                    except ValueError: pass
+                    db(f'update autoresponder set whitelist = "{",".join(whitelist)}" where name = "{name}"')
+            elif args[2] == 'blist':
+                result = db(f'select blacklist from autoresponder where name = "{name}"')
+                if len(result) != 0:
+                    blacklist: list = result[0][0].split(sep=',')
+                    if args[1] == 'add':
+                        blacklist.append(args[3])
+                    elif args[1] == 'remove':
+                        blacklist.remove(args[3])
+                    try: whitelist.remove('')
+                    except ValueError: pass
+                    db(f'update autoresponder set blacklist = "{",".join(blacklist)}" where name = "{name}"')
+            elif args[1] == 'list':
+                if args[2] == 'use':
+                    if args[3] == 'wlist':
+                        db(f'update autoresponder set usewhitelist = 1 where name = "{name}"')
+                        print('wlist')
+                    elif args[3] == 'blist':
+                        print('blist')
+                        db(f'update autoresponder set usewhitelist = 0 where name = "{name}"')
     elif old_text != msg.text: await bot.edit_message_text(msg.chat.id, msg.id, msg.text)
 
     with open('config.ini', 'w') as configfile: config.write(configfile)
-
     if not ava_enabled: threading.Thread(target=ava).start()
 
 
@@ -218,16 +272,12 @@ async def autoresponder(client: Client, msg: types.Message):
     if msg.chat.type != enums.ChatType.PRIVATE and msg.chat.type != enums.ChatType.BOT:
         if msg.reply_to_message is not None:
             if msg.reply_to_message.from_user is not None:
-                if msg.reply_to_message.from_user == bot.me:
-                    pass
-                else:
-                    return
-            else:
-                return
-        else:
-            return
-    else:
-        pass
+                if msg.reply_to_message.from_user == bot.me: pass
+                else: return
+            else: return
+        else: return
+    else: pass
+
     result = db('select * from autoresponder')
     if len(result) != 0:
         for i in result:
@@ -239,8 +289,6 @@ async def autoresponder(client: Client, msg: types.Message):
 
             whitelist: list = whitelist_str.split(sep=',')
             blacklist: list = blacklist_str.split(sep=',')
-
-            print(whitelist)
 
             send: bool = True
 
