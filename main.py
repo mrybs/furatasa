@@ -405,6 +405,8 @@ def db(command: str):
 
 
 def main():
+    db('create table if not exists messages(name text,text text,type int)')
+    db('create table if not exists autoresponder(name text,entrance text,output text,whitelist text,blacklist text,usewhitelist shortint)')
     try:
         print('Бот запущен\n', 'Нажмите ctrl+d для выхода', sep='')
         bot.run()
