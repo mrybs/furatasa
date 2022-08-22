@@ -57,8 +57,17 @@ async def my_message(client: Client, msg: types.Message):
         await bot.edit_message_text(msg.chat.id, msg.id, f'id: {bot.get_me().id}\n'
                                                          f'username: @{bot.get_me().username}\n'
                                                          f'Звать {bot.get_me().first_name}')
-    elif msg.text == "!help":
-        await bot.edit_message_text(msg.chat.id, msg.id, msgs.HELP)
+    elif msg.text == "!help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.HELP)
+    elif msg.text == "!msg help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.MSGHELP)
+    elif msg.text == "!ava help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.AVAHELP)
+    elif msg.text == "!random help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.RANDOMHELP)
+    elif msg.text == "!user help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.USERHELP)
+    elif msg.text == "!inline help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.INLINEHELP)
+    elif msg.text == "!furatasa help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.FURATASAHELP)
+    elif msg.text == "!help help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.HELPHELP)
+    elif msg.text == "!type help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.TYPEHELP)
+    elif msg.text == "!creator help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.CREATORHELP)
+    elif msg.text == "!whoami help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.WHOAMIHELP)
     elif msg.text == "!chat":
         title = ''
         if msg.chat.title is not None: title = f'Название: {msg.chat.title}\n'
@@ -213,6 +222,7 @@ async def my_message(client: Client, msg: types.Message):
             for i in result:
                 names.append(i[0])
             await bot.edit_message_text(msg.chat.id, msg.id, ', '.join(names))
+        else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!msg auto get '):
         name = msg.text[14:]
         result: list = db(f'select * from autoresponder where name = "{name}"')
@@ -262,6 +272,24 @@ async def my_message(client: Client, msg: types.Message):
                     elif args[3] == 'blist':
                         print('blist')
                         db(f'update autoresponder set usewhitelist = 0 where name = "{name}"')
+        await bot.delete_messages(msg.chat.id, [msg.id])
+    elif msg.text.startswith('!user block '):
+        user = msg.text[11:]
+        try: await bot.block_user(int(user))
+        except ValueError: await bot.block_user(user)
+        except errors.exceptions.bad_request_400.UsernameNotOccupied: pass
+    elif msg.text.startswith('!user unblock '):
+        user = msg.text[13:]
+        try: await bot.unblock_user(int(user))
+        except ValueError: await bot.unblock_user(user)
+        except errors.exceptions.bad_request_400.UsernameNotOccupied: pass
+    elif msg.text == '!creator':
+        await bot.send_message("mrybs1", msgs.TOCREATOR)
+        await bot.delete_messages(msg.chat.id, [msg.id])
+    elif msg.text == '!furatasa channel':
+        await (await bot.get_chat('furatasa')).join()
+    elif msg.text == '!furatasa ideas':
+        await (await bot.get_chat('furatasa_ideas')).join()
     elif old_text != msg.text: await bot.edit_message_text(msg.chat.id, msg.id, msg.text)
 
     with open('config.ini', 'w') as configfile: config.write(configfile)
