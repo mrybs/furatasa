@@ -20,6 +20,9 @@ https://my.telegram.org/apps
 **[pyrogram]**\
 api_id = ваш api_id\
 api_hash = ваш api_hash\
+**[locale]**\
+lang = язык(в зависимости от языковых файлов)\
+file = путь до языковых файлов(по умолчанию languages/locale.{}.json, где {} - выбранный язык)\
 \
 **[avatar]**\
 default = расположение обычной аватарки\
