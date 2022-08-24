@@ -1,4 +1,4 @@
-try: import sys, random, sqlite3, datetime, threading, time
+try: import os, sys, random, sqlite3, datetime, threading, time, json
 except ImportError as ie:
     print(f'Ошибка, какой-то из необходимых модулей не установился. Используйте python 3.10.\n{ie}')
     sys.exit(1)
@@ -24,6 +24,22 @@ config.read('config.ini')
 bot = Client("my_account", api_id=config['pyrogram']['api_id'], api_hash=config['pyrogram']['api_hash'])
 
 ava_enabled = False
+
+
+def l(key: str) -> str:
+    filename = config['locale']['file'].format(config['locale']['lang'])
+    if not os.path.exists(filename):
+        filename = 'locale.fallback.json'
+        if not os.path.exists(filename):
+            print(f'\n\nLanguageError - Not found {config["locale"]["file"].format(config["locale"]["lang"])} or local.fallback.json\n\n')
+            sys.exit(1)
+    with open(filename, 'r') as file:
+        data = json.load(file)
+        try:
+            return data[key]
+        except KeyError:
+            print(f'\n\nLanguageError - Not found key {key} in {config["locale"]["file"].format(config["locale"]["lang"])}\n\n')
+            sys.exit(1)
 
 async def my_message(client: Client, msg: types.Message):
     if msg.text is None: return
@@ -54,9 +70,9 @@ async def my_message(client: Client, msg: types.Message):
     msg.text = new_text
 
     if msg.text == "!whoami":
-        await bot.edit_message_text(msg.chat.id, msg.id, f'id: {bot.get_me().id}\n'
-                                                         f'username: @{bot.get_me().username}\n'
-                                                         f'Звать {bot.get_me().first_name}')
+        await bot.edit_message_text(msg.chat.id, msg.id, f'{l("id")}: {bot.get_me().id}\n'
+                                                         f'{l("username")}: @{bot.get_me().username}\n'
+                                                         f'{l("name")} {bot.get_me().first_name}')
     elif msg.text == "!help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.HELP)
     elif msg.text == "!msg help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.MSGHELP)
     elif msg.text == "!ava help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.AVAHELP)
@@ -70,36 +86,38 @@ async def my_message(client: Client, msg: types.Message):
     elif msg.text == "!whoami help": await bot.edit_message_text(msg.chat.id, msg.id, msgs.WHOAMIHELP)
     elif msg.text == "!chat":
         title = ''
-        if msg.chat.title is not None: title = f'Название: {msg.chat.title}\n'
         link = ''
-        if msg.chat.username is not None: link = f'Ссылка: https://t.me/{msg.chat.username}\n'
         bio = ''
-        if msg.chat.bio is not None: bio = f'Био: {msg.chat.bio}\n'
         description = ''
-        if msg.chat.description is not None: description = f'Описание: {msg.chat.description}\n'
         count = ''
-        if msg.chat.members_count is not None: count = f'Количество участников: {msg.chat.members_count}\n'
+        if msg.chat.title is not None: title = f'{l("title")}: {msg.chat.title}\n'
+        if msg.chat.username is not None: link = f'{l("link")}: https://t.me/{msg.chat.username}\n'
+        if msg.chat.bio is not None: bio = f'{l("bio")}: {msg.chat.bio}\n'
+        if msg.chat.description is not None: description = f'{l("description")}: {msg.chat.description}\n'
+        if msg.chat.members_count is not None: count = f'{l("users-count")}: {msg.chat.members_count}\n'
+
         chat_type = 'Это '
-        if msg.chat.type == enums.ChatType.PRIVATE:  chat_type += 'приватный чат'
-        elif msg.chat.type == enums.ChatType.BOT: chat_type += 'чат с ботом'
-        elif msg.chat.type == enums.ChatType.GROUP: chat_type += 'групповой чат'
-        elif msg.chat.type == enums.ChatType.SUPERGROUP: chat_type += 'супергруппа'
-        elif msg.chat.type == enums.ChatType.CHANNEL: chat_type += 'канал'
+        if msg.chat.type == enums.ChatType.PRIVATE:  chat_type += l("chat-private")
+        elif msg.chat.type == enums.ChatType.BOT: chat_type += l("chat-bot")
+        elif msg.chat.type == enums.ChatType.GROUP: chat_type += l("chat-group")
+        elif msg.chat.type == enums.ChatType.SUPERGROUP: chat_type += l("chat-supergroup")
+        elif msg.chat.type == enums.ChatType.CHANNEL: chat_type += l("chat-channel")
+
         permissions = ''
         if msg.chat.permissions is not None:
-            permissions = 'Обычному пользователю можно:\n'
-            if msg.chat.permissions.can_send_messages: permissions += '\t- Отправлять сообщения\n'
-            if msg.chat.permissions.can_send_media_messages: permissions += '\t- Отправлять медиафайлы\n'
-            if msg.chat.permissions.can_send_other_messages: permissions += '\t- Отправлять стикеры, анимации, игры и использовать inline-ботов\n'
-            if msg.chat.permissions.can_send_polls:  permissions += '\t- Создавать опросы\n'
-            if msg.chat.permissions.can_add_web_page_previews: permissions += '\t- Добавлять превью к веб-страницам\n'
-            if msg.chat.permissions.can_change_info: permissions += '\t- Изменять информацию о группе\n'
-            if msg.chat.permissions.can_invite_users: permissions += '\t- Приглашать пользователей\n'
-            if msg.chat.permissions.can_pin_messages: permissions += '\t- Закреплять сообщения\n'
-            if permissions == 'Обычному пользователю можно:\n': permissions = 'Обычному пользователю ничего нельзя\n'
-        reactions = '' if msg.chat.available_reactions is None else 'Доступные реакции: ' + ', '.join(msg.chat.available_reactions)
-        await bot.edit_message_text(msg.chat.id, msg.id, f'id: {msg.chat.id}\n{title}{type}\n{link}{bio}{description}{reactions}{count}{"Чат верифицирован" if msg.chat.is_verified else "Чат не верифицирован"}\n{permissions}')
-    elif msg.text.startswith('!dice'):
+            permissions = f'{l("permissions")}:\n'
+            if msg.chat.permissions.can_send_messages: permissions += f'\t- {l("permissions-send-message")}\n'
+            if msg.chat.permissions.can_send_media_messages: permissions += f'\t- {l("permissions-send-media")}\n'
+            if msg.chat.permissions.can_send_other_messages: permissions += f'\t- {l("permissions-send-sag-use-inline")}\n'
+            if msg.chat.permissions.can_send_polls:  permissions += f'\t- {l("permissions-send-polls")}\n'
+            if msg.chat.permissions.can_add_web_page_previews: permissions += f'\t- {l("permissions-add-web-preview")}\n'
+            if msg.chat.permissions.can_change_info: permissions += f'\t- {l("permissions-change-group-settings")}\n'
+            if msg.chat.permissions.can_invite_users: permissions += f'\t- {l("permissions-add-users")}\n'
+            if msg.chat.permissions.can_pin_messages: permissions += f'\t- {l("permissions-pin-messages")}\n'
+            if permissions == f'{l("permissions")}:\n': permissions = f'{l("permissions-nothing")}\n'
+        reactions = '' if msg.chat.available_reactions is None else f'{l("permissions-available-reactions")}: ' + ', '.join(msg.chat.available_reactions)
+        await bot.edit_message_text(msg.chat.id, msg.id, f'{l("id")}: {msg.chat.id}\n{title}{type}\n{link}{bio}{description}{reactions}{count}{l("verify") if msg.chat.is_verified else l("not-verify")}\n{permissions}')
+    elif msg.text.startswith('!random dice'):
         try:
             number = int(msg.text[5:])
             await bot.edit_message_text(msg.chat.id, msg.id, str(random.randint(1, number)))
@@ -129,26 +147,26 @@ async def my_message(client: Client, msg: types.Message):
     elif msg.text == '!msg info':
         if msg.reply_to_message is not None:
             username = '' if msg.reply_to_message.from_user.username is None else \
-                f'Username отправителя: @{msg.reply_to_message.from_user.username}\n'
-            await bot.edit_message_text(msg.chat.id, msg.id, f'id: {msg.reply_to_message.id}\nid отправителя: {msg.reply_to_message.from_user.id}\n{username}Время: {msg.date.strftime("%Y.%m.%d %H:%m:%s")}\nДля большей информации о пользователе вызовите !user info')
+                f'{l("sender-username")}: @{msg.reply_to_message.from_user.username}\n'
+            await bot.edit_message_text(msg.chat.id, msg.id, f'{l("id")}: {msg.reply_to_message.id}\n{l("sender-id")}: {msg.reply_to_message.from_user.id}\n{username}{l("time")}: {msg.date.strftime("%Y.%m.%d %H:%m:%s")}\n{l("msg-info-more-info")}')
         else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!user info '):
         try:
             id = int(msg.text[11:])
             user = (await bot.get_users([id]))[0]
-            contact = ('У вас в контактах' if user.is_contact else 'Не состоит у вас в контактах') + '\n'
-            mutualContact = ('У вас есть общие знакомые' if user.is_mutual_contact else 'У вас нет общих знакомых') + '\n'
-            deleted = 'Пользователь удален\n' if user.is_deleted else ''
-            verify = ('Пользователь верифицирован' if user.is_verified else 'Пользователь не верифицирован') + '\n'
-            premium = ('Пользователь является премиум аккаунтом' if user.is_premium else 'Пользователь не является премиум аккаунтом') + '\n'
-            await bot.edit_message_text(msg.chat.id, msg.id, f'id: {user.id}\nusername: {user.username}\nИмя: {user.first_name}\n{contact}{mutualContact}{deleted}{verify}{premium}')
+            contact = (l("user-info-contact") if user.is_contact else l("user-info-not-contact")) + '\n'
+            mutualContact = (l("user-info-mutual") if user.is_mutual_contact else l("user-info-not-mutual")) + '\n'
+            deleted = f'{l("user-info-deleted")}\n' if user.is_deleted else ''
+            verify = (l("user-info-verify") if user.is_verified else l("user-info-not-verify")) + '\n'
+            premium = (l("user-info-premium") if user.is_premium else l("user-info-not-premium")) + '\n'
+            await bot.edit_message_text(msg.chat.id, msg.id, f'{l("id")}: {user.id}\n{l("username")}: {user.username}\n{l("name")}: {user.first_name}\n{contact}{mutualContact}{deleted}{verify}{premium}')
         except Exception: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!msg all':
         result = db(f'select name from messages')
         if len(result) != 0:
             all_msgs = []
             for i in result: all_msgs.append(i[0])
-            await bot.edit_message_text(msg.chat.id, msg.id, 'Список всех сообщений: ' + (', '.join(all_msgs)), parse_mode=None)
+            await bot.edit_message_text(msg.chat.id, msg.id, f'{l("all-messages")}: ' + (', '.join(all_msgs)), parse_mode=None)
         else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!type'):
         msg.text = msg.text[5:]
@@ -200,8 +218,8 @@ async def my_message(client: Client, msg: types.Message):
         except ValueError: pass
         await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text == '!ava get time':
-        if config.get('avatar', 'dynamic') == 'true': await bot.edit_message_text(msg.chat.id, msg.id, f'Дневная аватарка с {config.get("avatar", "day_time")} до {config.get("avatar", "night_time")}\nНочная аватарка с {config.get("avatar", "night_time")} до {config.get("avatar", "day_time")}')
-        else: await bot.edit_message_text(msg.chat.id, msg.id, 'Динамическая аватарка выключена')
+        if config.get('avatar', 'dynamic') == 'true': await bot.edit_message_text(msg.chat.id, msg.id, f'{l("day-ava-from")} {config.get("avatar", "day_time")} {l("to")} {config.get("avatar", "night_time")}\n{l("night-ava-from")} {config.get("avatar", "night_time")} {l("to")} {config.get("avatar", "day_time")}')
+        else: await bot.edit_message_text(msg.chat.id, msg.id, l("dynamic-ava-not-enabled"))
     elif msg.text.startswith('!msg auto add '):
         if len(msg.text[14:].split(sep=' ')) == 3:
             name = msg.text[14:].split(sep=' ')[0]
@@ -227,15 +245,15 @@ async def my_message(client: Client, msg: types.Message):
         name = msg.text[14:]
         result: list = db(f'select * from autoresponder where name = "{name}"')
         if len(result) != 0:
-            info = f'Название: {name}\n'
-            info += f'Входная фраза: {result[0][1]}\n'
-            info += f'Выходная фраза: {result[0][2]}\n'
+            info = f'{l("title")}: {name}\n'
+            info += f'{l("phrase-in")}: {result[0][1]}\n'
+            info += f'{l("phrase-out")}: {result[0][2]}\n'
             if result[0][5] == 1:
                 if result[0][3] != '':
-                    info += f'Белый список: {result[0][3]}\n'
+                    info += f'{l("whitelist")}: {result[0][3]}\n'
             else:
                 if result[0][4] != '':
-                    info += f'Черный список: {result[0][4]}\n'
+                    info += f'{l("blacklist")}: {result[0][4]}\n'
             await bot.edit_message_text(msg.chat.id, msg.id, info)
         else: await bot.delete_messages(msg.chat.id, [msg.id])
     elif msg.text.startswith('!msg auto '):
@@ -286,10 +304,8 @@ async def my_message(client: Client, msg: types.Message):
     elif msg.text == '!creator':
         await bot.send_message("mrybs1", msgs.TOCREATOR)
         await bot.delete_messages(msg.chat.id, [msg.id])
-    elif msg.text == '!furatasa channel':
-        await (await bot.get_chat('furatasa')).join()
-    elif msg.text == '!furatasa ideas':
-        await (await bot.get_chat('furatasa_ideas')).join()
+    elif msg.text == '!furatasa channel': await (await bot.get_chat('furatasa')).join()
+    elif msg.text == '!furatasa ideas': await (await bot.get_chat('furatasa_ideas')).join()
     elif old_text != msg.text: await bot.edit_message_text(msg.chat.id, msg.id, msg.text)
 
     with open('config.ini', 'w') as configfile: config.write(configfile)
@@ -408,12 +424,10 @@ def main():
     db('create table if not exists messages(name text,text text,type int)')
     db('create table if not exists autoresponder(name text,entrance text,output text,whitelist text,blacklist text,usewhitelist shortint)')
     try:
-        print('Бот запущен\n', 'Нажмите ctrl+d для выхода', sep='')
+        print(f'{l("bot-started")}\n', l("press-to-exit"), sep='')
         bot.run()
-    except KeyError:
-        print('KeyError')
-    except Exception:
-        print('До свидания!')
+    except KeyboardInterrupt: pass
+    print(l("goodbye"))
     return 0
 
 
